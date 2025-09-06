@@ -1,21 +1,22 @@
 {
-    "name": "eddie-website-transformer",
+    "name": "eddie-flutter-generator",
     "version": "1.0.0",
-    "description": "n8n-based website transformation and GitHub Pages deployment system",
-    "main": "index.js",
+    "description": "Extract website content and rebuild as Flutter app on GitHub Pages",
+    "main": "scripts/generate-app-github-actions.js",
     "scripts": {
-        "start": "node index.js",
-        "dev": "nodemon index.js",
-        "setup": "node scripts/setup.js",
-        "deploy": "node scripts/deploy.js",
-        "update-repos": "node scripts/update-repos.js"
+        "generate": "node scripts/generate-app-single-commit.js",
+        "generate-old": "node scripts/generate-app-github-actions.js",
+        "example": "node scripts/example.js",
+        "github": "node scripts/github.js"
     },
     "keywords": [
-        "n8n",
         "website",
-        "transformation",
+        "extraction",
+        "flutter",
+        "json",
         "github",
         "pages",
+        "cross-platform",
         "automation"
     ],
     "author": "Jan Vincent Alamis",
@@ -26,11 +27,7 @@
         "cheerio": "^1.0.0-rc.12",
         "dotenv": "^16.3.1",
         "fs-extra": "^11.2.0",
-        "n8n": "^1.0.0",
-        "puppeteer": "^21.6.1",
+        "puppeteer": "^24.19.0",
         "yargs": "^17.7.2"
-    },
-    "devDependencies": {
-        "nodemon": "^3.0.2"
     }
 }

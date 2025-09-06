@@ -1,15 +1,14 @@
-# Eddie - Website Transformation & Deployment System
+# Eddie - Website to Flutter App Generator
 
-A powerful n8n-based system that ingests websites, transforms them into better versions, and automatically deploys them to GitHub Pages for free hosting and demos.
+A powerful tool that extracts website content and rebuilds it as a modern Flutter app deployed to GitHub Pages.
 
 ## Features
 
-- 🚀 **Website Ingestion**: Automatically scrape and analyze websites
-- ✨ **AI-Powered Transformation**: Enhance websites with modern design and functionality
-- 📦 **Automated Repository Creation**: Creates GitHub repos with consistent naming
-- 🌐 **GitHub Pages Deployment**: Automatic deployment to free hosting
-- 🔄 **Bulk Updates**: Update multiple repositories simultaneously
-- ⚙️ **Configurable**: Easy customization for different use cases
+- 📋 **Website Extraction**: Crawl and extract all content from websites
+- 📄 **JSON Output**: Convert website content to structured JSON format
+- 🎨 **Flutter Rebuild**: Generate modern Flutter app from extracted data
+- 🌐 **GitHub Pages**: Deploy Flutter web app to free hosting
+- 📱 **Cross-Platform**: Works on Web, iOS, and Android
 
 ## Quick Start
 
@@ -17,7 +16,7 @@ A powerful n8n-based system that ingests websites, transforms them into better v
 
    ```bash
    cp env.example .env
-   # Edit .env with your GitHub token and configuration
+   # Edit .env with your GitHub token and username
    ```
 
 2. **Install Dependencies**
@@ -26,56 +25,100 @@ A powerful n8n-based system that ingests websites, transforms them into better v
    npm install
    ```
 
-3. **Initialize n8n Workflows**
+## Quick Start
 
-   ```bash
-   npm run setup
-   ```
-
-4. **Start the System**
-   ```bash
-   npm start
-   ```
-
-## Usage
-
-### Transform a Single Website
+### One Command to Rule Them All
 
 ```bash
-node scripts/transform.js --url "https://example.com" --name "my-transformed-site"
+# Generate from any website (uses GitHub Actions)
+npm run generate -- --url "https://example.com"
+
+# Or use predefined websites
+npm run example
+npm run github
 ```
 
-### Bulk Repository Updates
+### How It Works
+
+1. **Extracts** website content to JSON
+2. **Creates** GitHub repository with Flutter template
+3. **Deploys** via GitHub Actions (automatic Flutter build)
+4. **Result**: Live Flutter app on GitHub Pages
+
+### Advanced Options
 
 ```bash
-npm run update-repos
+# Custom app name
+npm run generate -- --url "https://example.com" --name "my-awesome-app"
+
+# Custom description
+npm run generate -- --url "https://example.com" --description "My custom Flutter app"
+
+# Limit crawling (faster)
+npm run generate -- --url "https://example.com" --depth 1 --max-pages 10
 ```
 
-### Deploy to GitHub Pages
+### Create Custom Website Scripts
 
 ```bash
-npm run deploy
+# Copy the template
+cp scripts/template.js scripts/mysite.js
+
+# Edit the script with your website details
+# Then run:
+npm run mysite
 ```
+
+### Manual Steps (if needed)
+
+```bash
+# Step 1: Extract website to JSON
+npm run extract -- --url "https://example.com"
+
+# Step 2: Build Flutter app
+npm run build-flutter -- --repo "my-website-data"
+```
+
+## Options
+
+```bash
+# Custom repository name
+npm run extract -- --url "https://example.com" --name "my-flutter-app"
+
+# Custom description
+npm run extract -- --url "https://example.com" --description "My Flutter app"
+
+# Limit crawling (faster)
+npm run extract -- --url "https://example.com" --depth 1 --max-pages 10
+```
+
+## Output
+
+- ✅ **GitHub Repository** with extracted data
+- ✅ **JSON file** (`site-data.json`) with all website content
+- ✅ **Flutter App** with modern Material Design 3 UI
+- ✅ **GitHub Pages** live Flutter web app
+- ✅ **Cross-Platform** - works on Web, iOS, Android
+
+## Architecture
+
+- **Node.js**: Website extraction and GitHub API integration
+- **Flutter**: Modern cross-platform app generation
+- **GitHub Pages**: Free hosting for Flutter web apps
+- **Material Design 3**: Modern, responsive UI components
 
 ## Configuration
 
 Edit `.env` file to configure:
 
-- GitHub credentials and organization
-- n8n webhook URLs
-- Repository naming conventions
-- Transformation settings
-
-## Architecture
-
-- **n8n Workflows**: Handle website ingestion and transformation
-- **GitHub API**: Repository creation and management
-- **Puppeteer**: Website scraping and analysis
-- **Cheerio**: HTML parsing and manipulation
-- **GitHub Pages**: Free hosting for transformed sites
+- `GITHUB_TOKEN`: Your GitHub personal access token
+- `GITHUB_USERNAME`: Your GitHub username
+- `REPO_PREFIX`: Prefix for repository names (default: "flutter-app")
+- `MAX_CRAWL_DEPTH`: Maximum crawl depth (default: 2)
+- `MAX_PAGES`: Maximum pages to crawl (default: 20)
 
 ## Repository Naming Convention
 
 Repositories follow the pattern: `{REPO_PREFIX}-{timestamp}-{domain}`
 
-Example: `transformed-site-20241201-example-com`
+Example: `flutter-app-20241201-example-com`
