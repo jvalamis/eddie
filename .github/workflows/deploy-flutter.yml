@@ -33,8 +33,47 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Configure Flutter for web
+        run: |
+          # Convert repo name to valid Dart package name
+          REPO_NAME="${{ github.event.repository.name }}"
+          DART_NAME=$(echo "$REPO_NAME" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+          echo "Converting '$REPO_NAME' to Dart package name: '$DART_NAME'"
+
+          # Backup our custom files before flutter create overwrites them
+          cp web/index.html web/index.html.backup
+          if [ -f web/site-data.json ]; then
+            cp web/site-data.json web/site-data.json.backup
+          fi
+
+          # Create Flutter project
+          flutter create . --platforms web --project-name "$DART_NAME"
+
+          # Restore our custom files
+          cp web/index.html.backup web/index.html
+          if [ -f web/site-data.json.backup ]; then
+            cp web/site-data.json.backup web/site-data.json
+          fi
+
+          # Verify the placeholder is there
+          grep -n 'base href="\$FLUTTER_BASE_HREF"' web/index.html || echo "ERROR: Base href placeholder not found!"
+
+      - name: Copy content files to assets
+        run: |
+          # Ensure assets directory exists
+          mkdir -p assets
+          # Copy content.json (Eddie format) to assets directory
+          cp web/content.json assets/content.json
+          # Also copy site-data.json for backward compatibility
+          cp web/site-data.json assets/site-data.json
+          echo "✅ Copied content files to assets directory"
+
       - name: Build Flutter Web
         run: flutter build web --release --base-href /${{ github.event.repository.name }}/
+
+      - name: Enable GitHub Pages (Actions source)
+        run: |
+          gh api repos/${{ github.repository }}/pages -X POST -f source[type]=workflow -f source[branch]=main || echo "Pages already enabled"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -54,3 +93,176 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Wait for Pages & probe
+        run: |
+          PAGE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo "Probing deployed site: $PAGE_URL"
+
+          # Wait for Pages to be ready
+          for i in {1..10}; do
+            if curl -fsSL "$PAGE_URL/index.html" > /dev/null; then
+              echo "✅ Pages deployment ready"
+              break
+            else
+              echo "⏳ Waiting for Pages deployment... ($i/10)"
+              sleep 5
+            fi
+          done
+
+          # Probe critical files
+          for file in \
+            index.html \
+            site-data.json \
+            main.dart.js \
+            flutter_bootstrap.js
+          do
+            if curl -fsSL "$PAGE_URL/$file" > /dev/null; then
+              echo "✅ $file accessible"
+            else
+              echo "❌ $file not accessible"
+              exit 1
+            fi
+          done
+
+          echo "🎉 All critical files accessible"
+
+      - name: Setup Node.js for Flutter debugging
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Flutter debugging dependencies
+        run: |
+          npm install puppeteer commander
+          echo "Flutter debugging dependencies installed"
+
+      - name: Run Flutter debugging
+        run: |
+          PAGE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo "🐛 Running Flutter debugging on: $PAGE_URL"
+
+          # Create a simple Flutter debug script for GitHub Actions
+          cat > flutter-debug.js << 'EOF'
+          const puppeteer = require('puppeteer');
+
+          async function debugFlutter() {
+            const url = process.argv[2];
+            const browser = await puppeteer.launch({
+              headless: true,
+              args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            
+            try {
+              const page = await browser.newPage();
+              
+              // Enable console logging
+              page.on('console', msg => {
+                const type = msg.type();
+                const text = msg.text();
+                if (type === 'error') {
+                  console.log(`❌ Console Error: ${text}`);
+                } else if (type === 'warning') {
+                  console.log(`⚠️ Console Warning: ${text}`);
+                } else if (text.includes('Flutter') || text.includes('flutter')) {
+                  console.log(`📱 Flutter: ${text}`);
+                }
+              });
+              
+              // Enable network monitoring
+              page.on('response', response => {
+                if (!response.ok()) {
+                  console.log(`🌐 Network Error: ${response.url()} -> ${response.status()}`);
+                }
+              });
+              
+              console.log('🚀 Loading page...');
+              await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+              
+              console.log('⏳ Waiting for Flutter to initialize...');
+              
+              // Wait for Flutter to be available
+              await page.waitForFunction(() => {
+                return window.flutter !== undefined || 
+                       document.querySelector('flutter-view') !== null ||
+                       document.querySelector('flt-scene-host') !== null;
+              }, { timeout: 30000 });
+              
+              console.log('✅ Flutter detected!');
+              
+              // Check Flutter status
+              const flutterStatus = await page.evaluate(() => {
+                return {
+                  hasFlutter: window.flutter !== undefined,
+                  hasFlutterLoader: window._flutter !== undefined,
+                  hasFlutterView: document.querySelector('flutter-view') !== null,
+                  hasSceneHost: document.querySelector('flt-scene-host') !== null,
+                  bodyContent: document.body.innerText.length,
+                  scripts: document.querySelectorAll('script').length,
+                  errors: window.flutterErrors || []
+                };
+              });
+              
+              console.log('📊 Flutter Status:');
+              console.log(`  Has Flutter: ${flutterStatus.hasFlutter}`);
+              console.log(`  Has Flutter Loader: ${flutterStatus.hasFlutterLoader}`);
+              console.log(`  Has Flutter View: ${flutterStatus.hasFlutterView}`);
+              console.log(`  Has Scene Host: ${flutterStatus.hasSceneHost}`);
+              console.log(`  Body Content Length: ${flutterStatus.bodyContent}`);
+              console.log(`  Scripts: ${flutterStatus.scripts}`);
+              
+              if (flutterStatus.errors.length > 0) {
+                console.log('❌ Flutter Errors:');
+                flutterStatus.errors.forEach(error => console.log(`  ${error}`));
+              }
+              
+              // Check for Flutter app content
+              const contentCheck = await page.evaluate(() => {
+                const bodyText = document.body.innerText;
+                const hasContent = bodyText.length > 100;
+                const hasFlutterContent = bodyText.includes('Example Domain') || 
+                                         bodyText.includes('Website') ||
+                                         bodyText.length > 500;
+                
+                return {
+                  hasContent,
+                  hasFlutterContent,
+                  contentLength: bodyText.length,
+                  contentPreview: bodyText.substring(0, 200)
+                };
+              });
+              
+              console.log('📊 Content Check:');
+              console.log(`  Has Content: ${contentCheck.hasContent}`);
+              console.log(`  Has Flutter Content: ${contentCheck.hasFlutterContent}`);
+              console.log(`  Content Length: ${contentCheck.contentLength}`);
+              console.log(`  Content Preview: ${contentCheck.contentPreview}`);
+              
+              console.log('');
+              console.log('📊 FLUTTER DEBUG SUMMARY:');
+              console.log('========================');
+              console.log(`✅ Flutter Loader: ${flutterStatus.hasFlutterLoader}`);
+              console.log(`✅ Flutter App: ${flutterStatus.hasFlutter}`);
+              console.log(`✅ Content Loaded: ${contentCheck.hasFlutterContent}`);
+              console.log(`✅ Content Length: ${contentCheck.contentLength}`);
+              
+              if (flutterStatus.errors.length > 0) {
+                console.log(`❌ Errors Found: ${flutterStatus.errors.length}`);
+                process.exit(1);
+              }
+              
+              console.log('🎉 Flutter app is working correctly!');
+              
+            } catch (error) {
+              console.error('❌ Flutter debugging failed:', error.message);
+              process.exit(1);
+            } finally {
+              await browser.close();
+            }
+          }
+
+          debugFlutter().catch(console.error);
+          EOF
+
+          # Run Flutter debugging
+          node flutter-debug.js "$PAGE_URL"

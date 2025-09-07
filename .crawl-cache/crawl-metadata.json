@@ -1,0 +1,44 @@
+{
+  "https://bayouarts.org-f0fe6162": {
+    "url": "https://bayouarts.org",
+    "timestamp": "2025-09-07T19:10:28.520Z",
+    "options": {
+      "depth": 2,
+      "maxPages": 20
+    },
+    "metadata": {
+      "pagesCount": 16,
+      "assetsCount": 49,
+      "crawlDepth": 2,
+      "maxPages": 20
+    }
+  },
+  "https://example.com-f0fe6162": {
+    "url": "https://example.com",
+    "timestamp": "2025-09-07T16:35:43.500Z",
+    "options": {
+      "depth": 2,
+      "maxPages": 20
+    },
+    "metadata": {
+      "pagesCount": 1,
+      "assetsCount": 0,
+      "crawlDepth": 2,
+      "maxPages": 20
+    }
+  },
+  "https://httpbin.org-f0fe6162": {
+    "url": "https://httpbin.org",
+    "timestamp": "2025-09-07T07:05:40.470Z",
+    "options": {
+      "depth": 2,
+      "maxPages": 20
+    },
+    "metadata": {
+      "pagesCount": 2,
+      "assetsCount": 0,
+      "crawlDepth": 2,
+      "maxPages": 20
+    }
+  }
+}

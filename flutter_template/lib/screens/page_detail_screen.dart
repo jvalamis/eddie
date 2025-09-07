@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/website_data.dart';
-import '../widgets/modern_app_bar.dart';
+import '../widgets/responsive_image.dart';
+import '../utils/responsive_layout.dart';
 
 class PageDetailScreen extends StatelessWidget {
   final PageData page;
@@ -13,194 +13,230 @@ class PageDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: ModernAppBar(
-        title: page.title.isNotEmpty ? page.title : 'Page Details',
-        showBackButton: true,
+      appBar: AppBar(
+        title: Text(
+          page.title.isNotEmpty ? page.title : 'Page Details',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        centerTitle: false,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(ResponsiveLayout.spacing16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: ResponsiveLayout.maxContentWidth,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPageHeader(context),
+              SizedBox(height: ResponsiveLayout.spacing24),
+              
+              // Content Sections with proper hierarchy
+              if (page.content.headings.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Content Structure',
+                  Icons.title,
+                  _buildHeadingsList(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+              
+              if (page.content.paragraphs.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Main Content',
+                  Icons.article,
+                  _buildParagraphsList(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+              
+              if (page.content.images.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Images',
+                  Icons.image,
+                  _buildImagesGrid(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+              
+              if (page.content.links.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Related Links',
+                  Icons.link,
+                  _buildLinksList(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+              
+              if (page.content.lists.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Lists',
+                  Icons.list,
+                  _buildListsList(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+              
+              if (page.content.tables.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Data Tables',
+                  Icons.table_chart,
+                  _buildTablesList(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+              
+              if (page.content.forms.isNotEmpty) ...[
+                _buildContentSection(
+                  context,
+                  'Forms',
+                  Icons.assignment,
+                  _buildFormsList(context),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing24),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageHeader(BuildContext context) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveLayout.spacing20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Page Header
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (page.title.isNotEmpty) ...[
-                      Text(
-                        page.title,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    if (page.description.isNotEmpty) ...[
-                      Text(
-                        page.description,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    Row(
-                      children: [
-                        const Icon(Icons.link, size: 16, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            page.url,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+            Text(
+              page.title,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            if (page.description.isNotEmpty) ...[
+              SizedBox(height: ResponsiveLayout.spacing8),
+              Text(
+                page.description,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                  ],
-                ),
+              ),
+            ],
+            SizedBox(height: ResponsiveLayout.spacing16),
+            Container(
+              padding: EdgeInsets.all(ResponsiveLayout.spacing12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.link,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  SizedBox(width: ResponsiveLayout.spacing8),
+                  Expanded(
+                    child: Text(
+                      page.url,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-            
-            const SizedBox(height: 16),
-            
-            // Content Sections
-            if (page.headings.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Headings',
-                Icons.title,
-                _buildHeadingsList(context),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (page.paragraphs.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Content',
-                Icons.article,
-                _buildParagraphsList(context),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (page.images.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Images',
-                Icons.image,
-                _buildImagesGrid(context),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (page.links.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Links',
-                Icons.link,
-                _buildLinksList(context),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (page.lists.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Lists',
-                Icons.list,
-                _buildListsList(context),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (page.tables.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Tables',
-                Icons.table_chart,
-                _buildTablesList(context),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (page.forms.isNotEmpty) ...[
-              _buildSection(
-                context,
-                'Forms',
-                Icons.assignment,
-                _buildFormsList(context),
-              ),
-              const SizedBox(height: 16),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSection(BuildContext context, String title, IconData icon, Widget content) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildContentSection(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Widget content,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(icon, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
+            Icon(
+              icon,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
             ),
-            const SizedBox(height: 12),
-            content,
+            SizedBox(width: ResponsiveLayout.spacing8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
           ],
         ),
-      ),
+        SizedBox(height: ResponsiveLayout.spacing16),
+        content,
+      ],
     );
   }
 
   Widget _buildHeadingsList(BuildContext context) {
     return Column(
-      children: page.headings.map((heading) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
+      children: page.content.headings.map((heading) {
+        return Container(
+          margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing8),
+          padding: EdgeInsets.all(ResponsiveLayout.spacing12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 24,
-                height: 24,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Center(
                   child: Text(
                     'H${heading.level}',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: ResponsiveLayout.spacing12),
               Expanded(
                 child: Text(
                   heading.text,
-                  style: TextStyle(
-                    fontSize: heading.level == 1 ? 18 : heading.level == 2 ? 16 : 14,
-                    fontWeight: heading.level <= 2 ? FontWeight.bold : FontWeight.normal,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: heading.level <= 2 ? FontWeight.bold : FontWeight.w600,
+                        fontSize: heading.level == 1 ? 20 : heading.level == 2 ? 18 : 16,
+                      ),
                 ),
               ),
             ],
@@ -212,13 +248,23 @@ class PageDetailScreen extends StatelessWidget {
 
   Widget _buildParagraphsList(BuildContext context) {
     return Column(
-      children: page.paragraphs.map((paragraph) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
+      children: page.content.paragraphs.map((paragraph) {
+        return Container(
+          margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing16),
+          padding: EdgeInsets.all(ResponsiveLayout.spacing16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            ),
+          ),
           child: MarkdownBody(
             data: paragraph.text,
             styleSheet: MarkdownStyleSheet(
-              p: Theme.of(context).textTheme.bodyMedium,
+              p: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    height: 1.6,
+                  ),
             ),
           ),
         );
@@ -227,47 +273,51 @@ class PageDetailScreen extends StatelessWidget {
   }
 
   Widget _buildImagesGrid(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: page.images.length,
-      itemBuilder: (context, index) {
-        final image = page.images[index];
-        return Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: CachedNetworkImage(
-                  imageUrl: image.src,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  errorWidget: (context, url, error) => const Center(
-                    child: Icon(Icons.error),
-                  ),
-                ),
-              ),
-              if (image.alt != null && image.alt!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    image.alt!,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = ResponsiveLayout.getCrossAxisCount(context);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: ResponsiveLayout.spacing12,
+            mainAxisSpacing: ResponsiveLayout.spacing12,
+            childAspectRatio: 1.2,
           ),
+          itemCount: page.content.images.length,
+          itemBuilder: (context, index) {
+            final image = page.content.images[index];
+            return Card(
+              clipBehavior: Clip.antiAlias,
+              elevation: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: ResponsiveImage(
+                      imageUrl: image.src,
+                      altText: image.alt,
+                      fit: BoxFit.cover,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                    ),
+                  ),
+                  if (image.alt != null && image.alt!.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.all(ResponsiveLayout.spacing8),
+                      child: Text(
+                        image.alt!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -275,12 +325,30 @@ class PageDetailScreen extends StatelessWidget {
 
   Widget _buildLinksList(BuildContext context) {
     return Column(
-      children: page.links.map((link) {
-        return ListTile(
-          leading: const Icon(Icons.link),
-          title: Text(link.text),
-          subtitle: Text(link.href),
-          onTap: () => _launchUrl(link.href),
+      children: page.content.links.map((link) {
+        return Card(
+          margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing8),
+          child: ListTile(
+            leading: Icon(
+              Icons.link,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: Text(
+              link.text,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            subtitle: Text(
+              link.href,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            onTap: () => _launchUrl(link.href),
+            trailing: Icon(
+              Icons.open_in_new,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
         );
       }).toList(),
     );
@@ -288,32 +356,47 @@ class PageDetailScreen extends StatelessWidget {
 
   Widget _buildListsList(BuildContext context) {
     return Column(
-      children: page.lists.map((list) {
+      children: page.content.lists.map((list) {
         return Card(
+          margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing12),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: EdgeInsets.all(ResponsiveLayout.spacing16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${list.type.toUpperCase()} List',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                ...list.items.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        list.type == 'ol' ? '•' : '•',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item)),
-                    ],
-                  ),
-                )),
+                ),
+                SizedBox(height: ResponsiveLayout.spacing12),
+                ...list.items.map((item) => Padding(
+                      padding: EdgeInsets.only(bottom: ResponsiveLayout.spacing8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            margin: EdgeInsets.only(
+                              top: ResponsiveLayout.spacing6,
+                              right: ResponsiveLayout.spacing12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
               ],
             ),
           ),
@@ -324,19 +407,30 @@ class PageDetailScreen extends StatelessWidget {
 
   Widget _buildTablesList(BuildContext context) {
     return Column(
-      children: page.tables.map((table) {
+      children: page.content.tables.map((table) {
         return Card(
+          margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing12),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: EdgeInsets.all(ResponsiveLayout.spacing16),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columns: table.headers.map((header) => DataColumn(
-                  label: Text(header),
-                )).toList(),
+                      label: Text(
+                        header,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    )).toList(),
                 rows: table.rows.map((row) => DataRow(
-                  cells: row.map((cell) => DataCell(Text(cell))).toList(),
-                )).toList(),
+                      cells: row.map((cell) => DataCell(
+                            Text(
+                              cell,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          )).toList(),
+                    )).toList(),
               ),
             ),
           ),
@@ -347,30 +441,55 @@ class PageDetailScreen extends StatelessWidget {
 
   Widget _buildFormsList(BuildContext context) {
     return Column(
-      children: page.forms.map((form) {
+      children: page.content.forms.map((form) {
         return Card(
+          margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing12),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: EdgeInsets.all(ResponsiveLayout.spacing16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Form: ${form.action}',
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                const SizedBox(height: 8),
-                Text('Method: ${form.method}'),
-                const SizedBox(height: 8),
-                ...form.fields.map((field) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Row(
-                    children: [
-                      Text('${field.type}: '),
-                      Text(field.name),
-                      if (field.required) const Text(' (required)', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                )),
+                SizedBox(height: ResponsiveLayout.spacing8),
+                Text(
+                  'Method: ${form.method}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                SizedBox(height: ResponsiveLayout.spacing12),
+                ...form.fields.map((field) => Container(
+                      margin: EdgeInsets.only(bottom: ResponsiveLayout.spacing8),
+                      padding: EdgeInsets.all(ResponsiveLayout.spacing8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${field.type}: ',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          Text(
+                            field.name,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          if (field.required)
+                            Text(
+                              ' (required)',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                            ),
+                        ],
+                      ),
+                    )),
               ],
             ),
           ),

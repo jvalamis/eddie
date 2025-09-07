@@ -2,6 +2,9 @@ class WebsiteData {
   final String domain;
   final String originalUrl;
   final DateTime crawledAt;
+  final String title;
+  final String description;
+  final String keywords;
   final List<PageData> pages;
   final List<AssetData> assets;
 
@@ -9,6 +12,9 @@ class WebsiteData {
     required this.domain,
     required this.originalUrl,
     required this.crawledAt,
+    required this.title,
+    required this.description,
+    required this.keywords,
     required this.pages,
     required this.assets,
   });
@@ -18,6 +24,9 @@ class WebsiteData {
       domain: json['metadata']['domain'] ?? '',
       originalUrl: json['metadata']['originalUrl'] ?? '',
       crawledAt: DateTime.parse(json['metadata']['crawledAt'] ?? DateTime.now().toIso8601String()),
+      title: json['metadata']['title'] ?? 'Website',
+      description: json['metadata']['description'] ?? '',
+      keywords: json['metadata']['keywords'] ?? '',
       pages: (json['pages'] as List<dynamic>?)
           ?.map((page) => PageData.fromJson(page))
           .toList() ?? [],
@@ -33,13 +42,7 @@ class PageData {
   final String path;
   final String title;
   final String description;
-  final List<HeadingData> headings;
-  final List<ParagraphData> paragraphs;
-  final List<ImageData> images;
-  final List<LinkData> links;
-  final List<ListData> lists;
-  final List<TableData> tables;
-  final List<FormData> forms;
+  final PageContentData content;
   final HeaderData? header;
   final FooterData? footer;
   final SidebarData? sidebar;
@@ -50,13 +53,7 @@ class PageData {
     required this.path,
     required this.title,
     required this.description,
-    required this.headings,
-    required this.paragraphs,
-    required this.images,
-    required this.links,
-    required this.lists,
-    required this.tables,
-    required this.forms,
+    required this.content,
     this.header,
     this.footer,
     this.sidebar,
@@ -69,6 +66,38 @@ class PageData {
       path: json['path'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
+      content: PageContentData.fromJson(json['content'] ?? {}),
+      header: json['header'] != null ? HeaderData.fromJson(json['header']) : null,
+      footer: json['footer'] != null ? FooterData.fromJson(json['footer']) : null,
+      sidebar: json['sidebar'] != null ? SidebarData.fromJson(json['sidebar']) : null,
+      mainContent: json['mainContent'] != null ? MainContentData.fromJson(json['mainContent']) : null,
+    );
+  }
+}
+
+class PageContentData {
+  final List<HeadingData> headings;
+  final List<ParagraphData> paragraphs;
+  final List<ImageData> images;
+  final List<LinkData> links;
+  final List<ListData> lists;
+  final List<TableData> tables;
+  final List<FormData> forms;
+  final List<ContentBlockData> contentBlocks;
+
+  PageContentData({
+    required this.headings,
+    required this.paragraphs,
+    required this.images,
+    required this.links,
+    required this.lists,
+    required this.tables,
+    required this.forms,
+    required this.contentBlocks,
+  });
+
+  factory PageContentData.fromJson(Map<String, dynamic> json) {
+    return PageContentData(
       headings: (json['headings'] as List<dynamic>?)
           ?.map((h) => HeadingData.fromJson(h))
           .toList() ?? [],
@@ -90,10 +119,29 @@ class PageData {
       forms: (json['forms'] as List<dynamic>?)
           ?.map((f) => FormData.fromJson(f))
           .toList() ?? [],
-      header: json['header'] != null ? HeaderData.fromJson(json['header']) : null,
-      footer: json['footer'] != null ? FooterData.fromJson(json['footer']) : null,
-      sidebar: json['sidebar'] != null ? SidebarData.fromJson(json['sidebar']) : null,
-      mainContent: json['mainContent'] != null ? MainContentData.fromJson(json['mainContent']) : null,
+      contentBlocks: (json['contentBlocks'] as List<dynamic>?)
+          ?.map((c) => ContentBlockData.fromJson(c))
+          .toList() ?? [],
+    );
+  }
+}
+
+class ContentBlockData {
+  final String type;
+  final String content;
+  final List<String> classes;
+
+  ContentBlockData({
+    required this.type,
+    required this.content,
+    required this.classes,
+  });
+
+  factory ContentBlockData.fromJson(Map<String, dynamic> json) {
+    return ContentBlockData(
+      type: json['type'] ?? '',
+      content: json['content'] ?? '',
+      classes: (json['classes'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
 }

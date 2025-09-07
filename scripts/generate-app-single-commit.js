@@ -2,6 +2,11 @@
 
 const { MultiPageTransformer } = require("../lib/multi-page-transformer");
 const { GitHubManager } = require("../lib/github-manager");
+const { CrawlCache } = require("../lib/crawl-cache");
+const {
+  normalizeToEddieSchema,
+  validateEddieDoc,
+} = require("../lib/normalizer");
 const fs = require("fs-extra");
 const path = require("path");
 const yargs = require("yargs");
@@ -12,7 +17,7 @@ const argv = yargs
     alias: "url",
     describe: "Website URL to extract",
     type: "string",
-    demandOption: true,
+    demandOption: false,
   })
   .option("n", {
     alias: "name",
@@ -34,12 +39,154 @@ const argv = yargs
     type: "number",
     default: 20,
   })
+  .option("force-recrawl", {
+    describe: "Force recrawl even if recent crawl exists",
+    type: "boolean",
+    default: false,
+  })
+  .option("cache-max-age", {
+    describe: "Maximum age of cached crawl in hours (default: 24)",
+    type: "number",
+    default: 24,
+  })
+  .option("clear-cache", {
+    describe: "Clear all crawl cache before running",
+    type: "boolean",
+    default: false,
+  })
+  .option("cache-stats", {
+    describe: "Show cache statistics and exit",
+    type: "boolean",
+    default: false,
+  })
   .help().argv;
+
+async function waitForDeployment(repoName) {
+  const maxWaitTime = 10 * 60 * 1000; // 10 minutes
+  const checkInterval = 30 * 1000; // 30 seconds
+  const startTime = Date.now();
+
+  console.log(`⏳ Monitoring GitHub Actions for repository: ${repoName}`);
+
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const { exec } = require("child_process");
+      const { promisify } = require("util");
+      const execAsync = promisify(exec);
+
+      // Check the status of the most recent workflow
+      const { stdout } = await execAsync(
+        `gh run list --repo ${process.env.GITHUB_USERNAME}/${repoName} --limit 1 --json status,conclusion,createdAt`
+      );
+
+      const runs = JSON.parse(stdout);
+      if (runs.length === 0) {
+        throw new Error("No workflows found");
+      }
+
+      const latestRun = runs[0];
+
+      if (latestRun.status === "in_progress" || latestRun.status === "queued") {
+        console.log(
+          `⏳ Latest workflow still running (${latestRun.status})...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, checkInterval));
+        continue;
+      }
+
+      // Workflow completed, check conclusion
+      if (latestRun.conclusion === "failure") {
+        // Get the failed workflow logs
+        console.log(`❌ Latest GitHub Actions workflow failed`);
+        try {
+          const { stdout: logs } = await execAsync(
+            `gh run view ${latestRun.id} --repo ${process.env.GITHUB_USERNAME}/${repoName} --log`
+          );
+          console.log(`📋 Workflow failure details:`);
+          console.log(logs.substring(0, 1000));
+        } catch (logError) {
+          console.log(`⚠️ Could not fetch workflow logs: ${logError.message}`);
+          console.log(
+            `💡 Check manually: https://github.com/${process.env.GITHUB_USERNAME}/${repoName}/actions`
+          );
+        }
+        throw new Error(
+          `Latest GitHub Actions workflow failed (${latestRun.conclusion})`
+        );
+      } else if (latestRun.conclusion === "success") {
+        console.log(`✅ Latest GitHub Actions workflow completed successfully`);
+        return;
+      } else {
+        throw new Error(
+          `Latest GitHub Actions workflow had unexpected conclusion: ${latestRun.conclusion}`
+        );
+      }
+    } catch (error) {
+      console.log(`⚠️ Error checking workflows: ${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    }
+  }
+
+  throw new Error("Timeout waiting for GitHub Actions to complete");
+}
 
 async function generateApp() {
   try {
+    // Initialize crawl cache
+    const crawlCache = new CrawlCache();
+
+    // Handle cache management commands
+    if (argv.cacheStats) {
+      const stats = await crawlCache.getCacheStats();
+      console.log("📊 Crawl Cache Statistics:");
+      console.log(`   Total entries: ${stats.totalEntries}`);
+      console.log(`   Total pages crawled: ${stats.totalPages}`);
+      console.log(`   Total assets downloaded: ${stats.totalAssets}`);
+      if (stats.oldestEntry) {
+        console.log(
+          `   Oldest entry: ${new Date(stats.oldestEntry).toLocaleString()}`
+        );
+      }
+      if (stats.newestEntry) {
+        console.log(
+          `   Newest entry: ${new Date(stats.newestEntry).toLocaleString()}`
+        );
+      }
+      return;
+    }
+
+    if (argv.clearCache) {
+      await crawlCache.clearCache();
+    }
+
+    // Validate URL is provided when not using cache management commands
+    if (!argv.url && !argv.cacheStats) {
+      console.error(
+        "❌ Error: URL is required when not using cache management commands"
+      );
+      console.error("💡 Use --help to see available options");
+      process.exit(1);
+    }
+
     console.log(`🚀 Generating Flutter app from: ${argv.url}`);
     console.log(`📊 Max depth: ${argv.depth}, Max pages: ${argv.maxPages}`);
+
+    // Check if we need to crawl
+    const crawlOptions = {
+      depth: argv.depth,
+      maxPages: argv.maxPages,
+    };
+
+    const shouldCrawl = await crawlCache.shouldCrawl(
+      argv.url,
+      crawlOptions,
+      argv.forceRecrawl
+    );
+
+    if (!shouldCrawl) {
+      console.log("⏭️ Skipping crawl - using cached data");
+      console.log("💡 Use --force-recrawl to recrawl anyway");
+    }
 
     // Step 1: Extract website data to JSON
     console.log("\n📋 Step 1: Extracting website content...");
@@ -53,17 +200,61 @@ async function generateApp() {
     transformer.baseUrl = new URL(argv.url);
     transformer.domain = transformer.baseUrl.hostname;
 
-    // Crawl and extract data
-    await transformer.crawlWebsite(argv.url);
-    await transformer.transformAllPages();
-    await transformer.downloadAssets();
+    let siteData;
 
-    // Convert to structured JSON
-    const siteData = transformer.convertToJSON();
+    if (shouldCrawl) {
+      // Crawl and extract data
+      await transformer.crawlWebsite(argv.url);
+      await transformer.transformAllPages();
+      await transformer.downloadAssets();
 
-    console.log(
-      `✅ Extracted data from ${siteData.pages.length} pages and ${siteData.assets.length} assets`
-    );
+      // Convert to structured JSON
+      siteData = transformer.convertToJSON();
+
+      // Record the crawl in cache
+      await crawlCache.recordCrawl(argv.url, crawlOptions, {
+        pagesCount: siteData.pages.length,
+        assetsCount: siteData.assets.length,
+        crawlDepth: argv.depth,
+        maxPages: argv.maxPages,
+      });
+
+      console.log(
+        `✅ Extracted data from ${siteData.pages.length} pages and ${siteData.assets.length} assets`
+      );
+    } else {
+      // Use cached data - load from existing repository
+      console.log("📂 Loading data from existing repository...");
+
+      try {
+        // Generate the repository name first
+        const repoName = argv.name || generateRepoName(argv.url);
+
+        // Try to load site-data.json from the existing repository
+        const siteDataUrl = `https://raw.githubusercontent.com/${process.env.GITHUB_USERNAME}/${repoName}/main/assets/site-data.json`;
+
+        const axios = require("axios");
+        const response = await axios.get(siteDataUrl);
+        siteData = response.data;
+
+        console.log(
+          `✅ Loaded cached data: ${siteData.pages.length} pages, ${siteData.assets.length} assets`
+        );
+      } catch (error) {
+        console.log("⚠️ Could not load cached data, falling back to crawl...");
+        console.log(`   Error: ${error.message}`);
+
+        // Fallback to crawling
+        await transformer.crawlWebsite(argv.url);
+        await transformer.transformAllPages();
+        await transformer.downloadAssets();
+        siteData = transformer.convertToJSON();
+
+        console.log(
+          `✅ Extracted data from ${siteData.pages.length} pages and ${siteData.assets.length} assets`
+        );
+      }
+    }
 
     // Step 2: Generate repository name
     const repoName = argv.name || generateRepoName(argv.url);
@@ -103,6 +294,13 @@ async function generateApp() {
     // Create the JSON file content
     const jsonContent = JSON.stringify(siteData, null, 2);
 
+    // Normalize to Eddie schema
+    console.log("🔄 Normalizing content to Eddie schema...");
+    const eddieDoc = await normalizeToEddieSchema(siteData);
+    validateEddieDoc(eddieDoc);
+    const eddieContent = JSON.stringify(eddieDoc, null, 2);
+    console.log("✅ Content normalized successfully");
+
     // Generate Flutter app from template
     const tempDir = path.join(__dirname, "../temp_flutter_build");
     const templateDir = path.join(__dirname, "../flutter_template");
@@ -110,6 +308,15 @@ async function generateApp() {
     // Clean and create temp directory
     await fs.remove(tempDir);
     await fs.copy(templateDir, tempDir);
+
+    // Copy eddie_renderer package into the Flutter app
+    const eddieRendererSource = path.join(
+      __dirname,
+      "../packages/eddie_renderer"
+    );
+    const eddieRendererDest = path.join(tempDir, "packages/eddie_renderer");
+    await fs.ensureDir(path.dirname(eddieRendererDest));
+    await fs.copy(eddieRendererSource, eddieRendererDest);
 
     // Update pubspec.yaml with correct app name
     const pubspecPath = path.join(tempDir, "pubspec.yaml");
@@ -120,10 +327,19 @@ async function generateApp() {
     );
     await fs.writeFile(pubspecPath, pubspecContent);
 
-    // Copy site-data.json to assets
+    // Copy content.json to assets (Eddie format)
     const assetsDir = path.join(tempDir, "assets");
     await fs.ensureDir(assetsDir);
+    await fs.writeFile(path.join(assetsDir, "content.json"), eddieContent);
+
+    // Also copy the old format for backward compatibility
     await fs.writeFile(path.join(assetsDir, "site-data.json"), jsonContent);
+
+    // Also copy to web directory for direct access in deployed app
+    const webDir = path.join(tempDir, "web");
+    await fs.ensureDir(webDir);
+    await fs.writeFile(path.join(webDir, "content.json"), eddieContent);
+    await fs.writeFile(path.join(webDir, "site-data.json"), jsonContent);
 
     // Update main.dart with correct app title
     const mainDartPath = path.join(tempDir, "lib/main.dart");
@@ -201,15 +417,19 @@ The Flutter app automatically reads the \`site-data.json\` file and creates a be
 
     // Create tree items for ALL files (JSON + Flutter template)
     const treeItems = [];
+    console.log("📁 Building file tree...");
     await addDirectoryToTree(tempDir, "", treeItems, owner, repoNameOnly);
+    console.log(`📁 Built tree with ${treeItems.length} files`);
 
     // Create the tree
+    console.log("🌳 Creating GitHub tree...");
     const { data: treeData } = await githubManager.octokit.rest.git.createTree({
       owner,
       repo: repoNameOnly,
       tree: treeItems,
       base_tree: baseTreeSha,
     });
+    console.log("✅ Tree created successfully");
 
     // Create the commit
     const { data: newCommitData } =
@@ -252,6 +472,27 @@ The Flutter app automatically reads the \`site-data.json\` file and creates a be
     console.log(
       `🔍 Check the Actions tab in your repository to monitor progress.`
     );
+
+    // Flutter debugging is now handled automatically by GitHub Actions
+    const deployedUrl = `https://${process.env.GITHUB_USERNAME}.github.io/${repoName}`;
+    console.log(
+      `\n🔍 Flutter debugging will run automatically in GitHub Actions...`
+    );
+    console.log(
+      `⏳ Check the Actions tab in your repository to monitor Flutter debugging progress.`
+    );
+
+    // Open browser after deployment
+    if (process.env.OPEN_BROWSER !== "false") {
+      console.log(`\n🌐 Opening deployed app in browser...`);
+      const { exec } = require("child_process");
+      exec(`open "${deployedUrl}"`, (error) => {
+        if (error) {
+          console.log(`⚠️ Could not open browser: ${error.message}`);
+          console.log(`🔗 Please open manually: ${deployedUrl}`);
+        }
+      });
+    }
   } catch (error) {
     console.error("❌ App generation failed:", error.message);
     process.exit(1);
@@ -278,6 +519,16 @@ async function addDirectoryToTree(
     const itemPath = path.join(dirPath, item.name);
     const treePath = relativePath ? `${relativePath}/${item.name}` : item.name;
 
+    // Skip build directories and generated files
+    if (
+      item.name === "build" ||
+      item.name === ".dart_tool" ||
+      item.name === "node_modules" ||
+      item.name === "pubspec.lock"
+    ) {
+      continue;
+    }
+
     if (item.isDirectory()) {
       await addDirectoryToTree(itemPath, treePath, treeItems, owner, repo);
     } else {
@@ -289,7 +540,9 @@ async function addDirectoryToTree(
         treePath.endsWith(".yaml") ||
         treePath.endsWith(".md") ||
         treePath.endsWith(".txt") ||
-        treePath.endsWith(".json")
+        treePath.endsWith(".json") ||
+        treePath.endsWith(".html") ||
+        treePath.endsWith(".dart")
       ) {
         treeItems.push({
           path: treePath,

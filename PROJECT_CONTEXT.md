@@ -29,3 +29,20 @@ Transform websites into **modern Flutter apps** with beautiful UI, focusing on t
 ## **Key Principle**
 
 **Content over styling** - Extract the message, rebuild with beautiful Flutter UI
+
+## **Deployment Checklist**
+
+After each deployment, **ALWAYS** check the live app:
+
+1. ✅ **Deployment completed** - GitHub Actions workflows finished successfully
+2. 🔍 **Visit the live URL** - Check the deployed Flutter app in browser
+3. 📱 **Test responsiveness** - Mobile, tablet, desktop views
+4. 🎨 **Verify design rules** - Material 3, typography, navigation, images
+5. 📊 **Check content** - All pages, images, and data loading correctly
+6. ⚡ **Performance check** - Loading speed, smooth interactions
+
+### **Current Live App:**
+
+🔗 **https://jvalamis.github.io/transformed-site-20250907-bayouarts-org**
+
+**Last deployed:** Bayou Arts Council website with full design principles implementation

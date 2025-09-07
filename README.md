@@ -122,3 +122,22 @@ Edit `.env` file to configure:
 Repositories follow the pattern: `{REPO_PREFIX}-{timestamp}-{domain}`
 
 Example: `flutter-app-20241201-example-com`
+
+## Deployment Verification
+
+After each deployment, **always check the live app**:
+
+```bash
+# Check current deployment
+npm run check -- --url "https://your-username.github.io/repo-name"
+
+# Or manually open the URL and verify:
+# 1. ✅ Deployment completed - GitHub Actions workflows finished
+# 2. 🔍 Visit the live URL - Check the deployed Flutter app
+# 3. 📱 Test responsiveness - Mobile, tablet, desktop views
+# 4. 🎨 Verify design rules - Material 3, typography, navigation
+# 5. 📊 Check content - All pages, images, and data loading
+# 6. ⚡ Performance check - Loading speed, smooth interactions
+```
+
+The deployment checker automatically opens the URL and provides a comprehensive checklist to verify all design principles are working correctly.

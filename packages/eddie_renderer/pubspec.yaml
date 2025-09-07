@@ -1,7 +1,6 @@
-name: website_app
-description: A modern Flutter app generated from website data
-publish_to: "none"
-version: 1.0.0+1
+name: eddie_renderer
+description: Universal content renderer for Eddie
+version: 1.0.0
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -10,6 +9,10 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^6.1.0
+  cached_network_image: ^3.3.0
+  url_launcher: ^6.2.1
+  flutter_markdown: ^0.6.18
+  http: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -18,5 +21,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/

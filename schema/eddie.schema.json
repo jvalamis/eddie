@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Eddie Content v1",
+  "type": "object",
+  "required": ["version", "site", "nav", "pages"],
+  "properties": {
+    "version": { "const": "1.0" },
+    "site": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "brandSeed": { "type": "string", "pattern": "^#?[0-9A-Fa-f]{6}$" },
+        "logo": { "type": "string" }
+      }
+    },
+    "nav": {
+      "type": "array",
+      "items": { 
+        "type": "object",
+        "required": ["title", "slug"],
+        "properties": { 
+          "title": { "type": "string" }, 
+          "slug": { "type": "string" } 
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug", "title", "sections"],
+        "properties": {
+          "slug": { "type": "string" },
+          "title": { "type": "string" },
+          "hero": {
+            "type": "object",
+            "properties": { 
+              "title": { "type": "string" }, 
+              "subtitle": { "type": "string" }, 
+              "image": { "type": "string" } 
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type"],
+              "properties": {
+                "type": { "enum": ["heading","paragraph","image","gallery","list","quote","button","html"] },
+                "level": { "type": "integer" },
+                "text": { "type": "string" },
+                "items": { "type": "array", "items": { "type": "string" } },
+                "src": { "type": "string" },
+                "alt": { "type": "string" },
+                "caption": { "type": "string" },
+                "href": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
