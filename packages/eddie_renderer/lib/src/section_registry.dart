@@ -8,76 +8,68 @@ import 'sections/quote.dart';
 import 'sections/button.dart';
 import 'sections/html.dart';
 
-/// Universal section registry for Eddie
-typedef SectionBuilder = Widget Function(BuildContext context, Map<String, dynamic> data);
+/// Registry that maps section types to their corresponding widgets
+class SectionRegistry {
+  static final Map<String, Widget Function(Map<String, dynamic>)> _registry = {
+    'heading': (data) => HeadingSection(
+      level: data['level'] ?? 1,
+      text: data['text'] ?? '',
+    ),
+    'paragraph': (data) => ParagraphSection(
+      text: data['text'] ?? '',
+    ),
+    'image': (data) => ImageSection(
+      src: data['src'] ?? '',
+      alt: data['alt'] ?? '',
+      caption: data['caption'],
+    ),
+    'gallery': (data) => GallerySection(
+      items: List<String>.from(data['items'] ?? []),
+    ),
+    'list': (data) => ListSection(
+      items: List<String>.from(data['items'] ?? []),
+    ),
+    'quote': (data) => QuoteSection(
+      text: data['text'] ?? '',
+    ),
+    'button': (data) => ButtonSection(
+      text: data['text'] ?? '',
+      href: data['href'],
+    ),
+    'html': (data) => HtmlSection(
+      html: data['html'] ?? '',
+    ),
+  };
 
-final Map<String, SectionBuilder> kSectionRegistry = {
-  'heading': (context, data) => HeadingSection(
-    level: data['level'] ?? 2,
-    text: data['text'] ?? '',
-  ),
-  'paragraph': (context, data) => ParagraphSection(
-    text: data['text'] ?? '',
-  ),
-  'image': (context, data) => ImageSection(
-    src: data['src'] as String?,
-    alt: data['alt'] as String?,
-    caption: data['caption'] as String?,
-  ),
-  'gallery': (context, data) => GallerySection(
-    items: (data['items'] as List?)?.cast<String>() ?? [],
-  ),
-  'list': (context, data) => ListSection(
-    items: (data['items'] as List?)?.cast<String>() ?? [],
-  ),
-  'quote': (context, data) => QuoteSection(
-    text: data['text'] ?? '',
-  ),
-  'button': (context, data) => ButtonSection(
-    text: data['text'] ?? 'Learn more',
-    href: data['href'] as String?,
-  ),
-  'html': (context, data) => HtmlSection(
-    html: data['text'] ?? '',
-  ),
-};
-
-/// Build a section widget from section data
-Widget buildSection(BuildContext context, String type, Map<String, dynamic> data) {
-  final builder = kSectionRegistry[type];
-  if (builder != null) {
-    return builder(context, data);
+  /// Get a widget for a section type
+  static Widget? buildSection(String type, Map<String, dynamic> data) {
+    final builder = _registry[type];
+    if (builder == null) {
+      debugPrint('Unknown section type: $type');
+      return null;
+    }
+    
+    try {
+      return builder(data);
+    } catch (e) {
+      debugPrint('Error building section $type: $e');
+      return null;
+    }
   }
-  
-  // Fallback for unknown section types
-  return Container(
-    padding: const EdgeInsets.all(16),
-    margin: const EdgeInsets.symmetric(vertical: 8),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-      border: Border.all(
-        color: Theme.of(context).colorScheme.error,
-        width: 1,
-      ),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Unknown section type: $type',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Data: ${data.toString()}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onErrorContainer,
-          ),
-        ),
-      ],
-    ),
-  );
+
+  /// Get all supported section types
+  static List<String> get supportedTypes => _registry.keys.toList();
+
+  /// Check if a section type is supported
+  static bool isSupported(String type) => _registry.containsKey(type);
+
+  /// Register a custom section type
+  static void register(String type, Widget Function(Map<String, dynamic>) builder) {
+    _registry[type] = builder;
+  }
+
+  /// Unregister a section type
+  static void unregister(String type) {
+    _registry.remove(type);
+  }
 }
